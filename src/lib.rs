@@ -28,7 +28,7 @@ use syn::{parse_macro_input, spanned::Spanned, Attribute, ItemStruct};
 /// ```
 ///
 /// ## Important!
-/// Don't forget to set [zestors::Actor::Address] to the new address!.
+/// Don't forget to set `Actor::Address` to the new address!.
 ///
 /// ## Addressable
 /// If you would like to be able to directly call methods like `.msg()` or `.req()`
@@ -52,16 +52,16 @@ pub fn derive_address(item: TokenStream) -> TokenStream {
         ///
         #[doc = #comment]
         #[derive(Debug, Clone)]
-        #vis struct #address_name(zestors::Address<#actor_name>);
+        #vis struct #address_name(zestors::address::Address<#actor_name>);
 
-        impl From<zestors::Address<#actor_name>> for #address_name {
-            fn from(address: zestors::Address<#actor_name>) -> Self {
+        impl From<zestors::address::Address<#actor_name>> for #address_name {
+            fn from(address: zestors::address::Address<#actor_name>) -> Self {
                 Self(address)
             }
         }
 
-        impl zestors::RawAddress for #address_name {
-            fn raw_address(&self) -> &zestors::Address<#actor_name> {
+        impl zestors::address::RawAddress for #address_name {
+            fn raw_address(&self) -> &zestors::address::Address<#actor_name> {
                 &self.0
             }
 
@@ -72,7 +72,7 @@ pub fn derive_address(item: TokenStream) -> TokenStream {
 }
 
 /// ## Description
-/// This macro can be used to derive `zestors::Addressable`. This means that you can now
+/// This macro can be used to derive `zestors::process::Addressable`. This means that you can now
 /// directly call methods like `.msg()` or `.req()` on this address.
 ///
 /// It can only be used in combination with `[#derive(Address)]`, and should be used on
@@ -96,7 +96,7 @@ pub fn derive_addressabe(item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        impl zestors::Addressable<#actor_name> for #address_name {}
+        impl zestors::address::Addressable<#actor_name> for #address_name {}
     }
     .into()
 }
