@@ -9,7 +9,7 @@ keywords = ["zestors", "actor", "actors", "actor-system", "macros"]
 categories = ["asynchronous", "concurrency"]
 
 [dependencies]
-syn = "1"
+syn = { version = "1", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
 
