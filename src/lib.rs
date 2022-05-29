@@ -1,137 +1,78 @@
-use proc_macro::TokenStream;
-use proc_macro2::Ident;
-use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Attribute, ItemStruct};
+#![allow(non_snake_case)]
 
-/// ## What it does
-/// Derive a custom address for an actor. This derive macro does the following:
-/// * Create a unit struct: `{Actor}Address(Address<{Actor}>);`
-/// * Implement `From<Address<{Actor}>>` for this address.
-/// * Implement `RawAddress<Actor = {Actor}>` for this address.
-/// * `#[derive(Debug, Clone)]` for this address.
-///
-/// The name of the struct can be changed by adding the optional attribute
-/// `#[address({AddressName})]` after the `#[derive]` usage.
-///
-/// ## Example
-/// ```ignore
-/// #[derive(Address)]
-/// #[address(MyActorAddress)] // this is optional
-/// struct MyActor {
-///     ...
-/// }
-///
-/// impl Actor for MyActor {
-///     type Address = MyActorAddress;
-///     ...
-/// }
-/// ```
-///
-/// ## Important!
-/// Don't forget to set `Actor::Address` to the new address!.
-///
-/// ## Addressable
-/// If you would like to be able to directly call methods like `.msg()` or `.req()`
-/// on your custom address, then you will probably want to `#[derive(Addressable)]`
-/// as well.
-#[proc_macro_derive(Address, attributes(address))]
-pub fn derive_address(item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as ItemStruct);
+pub(crate) mod derive_actor;
+pub(crate) mod derive_addr;
+pub(crate) mod derive_scheduler;
+pub(crate) mod zestors;
 
-    let actor_name = item.ident;
-    let vis = item.vis;
-    let address_name = match address_name(item.attrs.first(), &actor_name) {
-        Ok(name) => name,
-        Err(e) => return e.into_compile_error().into(),
-    };
+use derive_addr::{addr_generics, addr_ident_from_actor_ident, addr_struct};
+use proc_macro::TokenStream as TokenStream1;
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::{quote, ToTokens};
+use syn::{
+    braced, bracketed, custom_keyword, parenthesized,
+    parse::Parse,
+    parse2, parse_macro_input, parse_quote,
+    punctuated::Punctuated,
+    spanned::Spanned,
+    token::{Colon, Comma, For, Impl, Token, Where},
+    Attribute, AttributeArgs, Expr, ExprParen, FnArg, ImplItem, ImplItemMethod, ItemImpl,
+    ItemStruct, Meta, NestedMeta, PatType, Receiver, ReturnType, Signature, Token, Type,
+    TypeGenerics, TypeParen, Visibility, WhereClause,
+};
+use zestors::{attrs::ZestorsAttrs, zestors_proc_macro_attr};
 
-    let comment = format!("This address belongs to the actor: [{}].", actor_name);
-
-    quote! {
-        /// An automatically generated address using [zestors::derive::Address].
-        ///
-        #[doc = #comment]
-        #[derive(Debug, Clone)]
-        #vis struct #address_name(zestors::address::Address<#actor_name>);
-
-        impl From<zestors::address::Address<#actor_name>> for #address_name {
-            fn from(address: zestors::address::Address<#actor_name>) -> Self {
-                Self(address)
-            }
-        }
-
-        impl zestors::address::RawAddress for #address_name {
-            fn raw_address(&self) -> &zestors::address::Address<#actor_name> {
-                &self.0
-            }
-
-            type Actor = #actor_name;
-        }
-    }
-    .into()
+/// Derive the `Scheduler` trait for an actor.
+#[proc_macro_derive(Scheduler, attributes(scheduler))]
+pub fn derive_scheduler(item: TokenStream1) -> TokenStream1 {
+    derive_scheduler::derive_scheduler(parse_macro_input!(item as ItemStruct))
+        .map_or_else(|e| e.into_compile_error(), |v| v)
+        .into()
 }
 
-/// ## Description
-/// This macro can be used to derive `zestors::process::Addressable`. This means that you can now
-/// directly call methods like `.msg()` or `.req()` on this address.
-///
-/// It can only be used in combination with `[#derive(Address)]`, and should be used on
-/// the struct definition of the actor, **not** on the struct definition of the address.
-///
-/// /// ## Example
-/// ```ignore
-/// #[derive(Address, Addressable)]
-/// struct MyActor {
-///     ...
-/// }
-/// ```
-#[proc_macro_derive(Addressable, attributes(address))]
-pub fn derive_addressabe(item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as ItemStruct);
-
-    let actor_name = item.ident;
-    let address_name = match address_name(item.attrs.first(), &actor_name) {
-        Ok(name) => name,
-        Err(e) => return e.into_compile_error().into(),
-    };
-
-    quote! {
-        impl zestors::address::Addressable<#actor_name> for #address_name {}
-    }
-    .into()
+/// Derive the `Scheduler` trait for an actor that does not do any scheduling.
+#[proc_macro_derive(NoScheduler)]
+pub fn derive_no_scheduler(item: TokenStream1) -> TokenStream1 {
+    derive_scheduler::derive_no_scheduler(parse_macro_input!(item as ItemStruct))
+        .map_or_else(|e| e.into_compile_error(), |v| v)
+        .into()
 }
 
-fn address_name(attr: Option<&Attribute>, actor_name: &Ident) -> Result<Ident, syn::Error> {
-    match attr {
-        Some(attr) => match attr.parse_meta().unwrap() {
-            syn::Meta::Path(path) => Err(syn::Error::new_spanned(
-                path,
-                "Should be the identifier of the custom address",
-            )),
-            syn::Meta::List(list) => match list.nested.first().unwrap() {
-                syn::NestedMeta::Meta(meta) => match meta {
-                    syn::Meta::Path(path) => Ok(Ident::new(
-                        &format!("{}", path.segments.first().unwrap().ident),
-                        path.segments.first().unwrap().span(),
-                    )),
-                    _ => Err(syn::Error::new_spanned(
-                        meta,
-                        "Should be the identifier of the custom address",
-                    )),
-                },
-                syn::NestedMeta::Lit(lit) => Err(syn::Error::new_spanned(
-                    lit,
-                    "Should be the identifier of the custom address",
-                )),
-            },
-            syn::Meta::NameValue(name) => Err(syn::Error::new_spanned(
-                name,
-                "Should be the identifier of the custom address",
-            )),
-        },
-        None => Ok(Ident::new(
-            &format!("{}Address", actor_name),
-            actor_name.span(),
-        )),
-    }
+/// Derive a custom address for your actor.
+///
+/// By default this will generate an address for actor `MyActor` named `MyActorAddr`.
+/// To override this naming, use the #[addr(MyAdressName)] attribute.
+#[proc_macro_derive(Addr, attributes(addr))]
+pub fn derive_addr(item: TokenStream1) -> TokenStream1 {
+    derive_addr::derive_addr(parse_macro_input!(item as ItemStruct))
+        .map_or_else(|e| e.into_compile_error(), |v| v)
+        .into()
+}
+
+/// Derive a default `Actor` trait for your actor. This uses sensible defaults, however for real use
+/// it is recommended to implement the `Actor` trait manually.
+#[proc_macro_derive(Actor)]
+pub fn derive_actor(item: TokenStream1) -> TokenStream1 {
+    derive_actor::derive_actor(parse_macro_input!(item as ItemStruct))
+        .map_or_else(|e| e.into_compile_error(), |v| v)
+        .into()
+}
+
+/// A macro used to generate methods on the actor's address straight from the handler functions.
+#[proc_macro_attribute]
+pub fn zestors(attrs: TokenStream1, item: TokenStream1) -> TokenStream1 {
+    let impl_block = parse_macro_input!(item as ItemImpl);
+    let attrs = parse_macro_input!(attrs as ZestorsAttrs);
+
+    zestors_proc_macro_attr(attrs, impl_block)
+        .map_or_else(|e| e.into_compile_error(), |v| v)
+        .into()
+}
+
+pub(crate) mod kw {
+    use syn::custom_keyword;
+    custom_keyword!(addr);
+    custom_keyword!(As);
+    custom_keyword!(Inline);
+    custom_keyword!(Ignore);
 }
