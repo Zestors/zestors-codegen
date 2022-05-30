@@ -1,11 +1,6 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use syn::{
-    parse_quote,
-    punctuated::Punctuated,
-    token::{Brace, Colon, Gt, Lt, Semi, Struct},
-    Attribute, Field, FieldsNamed, Generics, ItemStruct, Meta,
-};
+use syn::{Attribute, Field, FieldsNamed, Generics, ItemStruct, Meta};
 
 /// The #[derive(Addr)] macro
 pub fn derive_actor(actor: ItemStruct) -> syn::Result<TokenStream> {
@@ -20,14 +15,16 @@ pub fn derive_actor(actor: ItemStruct) -> syn::Result<TokenStream> {
 
             type Error = zestors::core::AnyhowError;
 
-            type Exit = (Self, zestors::core::Signal<Self>);
+            type Halt = ();
 
-            async fn initialize(init: Self::Init, addr: Self::Addr<zestors::core::Local>) -> zestors::core::InitFlow<Self> {
+            type Exit = (Self, zestors::core::Event<Self>);
+
+            async fn initialize(init: Self::Init, addr: Self::Addr) -> zestors::core::InitFlow<Self> {
                 zestors::core::InitFlow::Init(init)
             }
 
-            fn handle_signal(self, signal: zestors::core::Signal<Self>, state: &mut zestors::core::State<Self>) -> zestors::core::SignalFlow<Self> {
-                zestors::core::SignalFlow::Exit((self, signal))
+            fn handle_event(self, event: zestors::core::Event<Self>, state: &mut zestors::core::State<Self>) -> zestors::core::EventFlow<Self> {
+                zestors::core::EventFlow::Exit((self, event))
             }
         }
     })

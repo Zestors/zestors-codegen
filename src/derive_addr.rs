@@ -137,6 +137,15 @@ pub fn addr_fields(actor_ident: &Ident, actor_generics: &Generics) -> FieldsName
 fn addr_traits(addr: &ItemStruct, actor: &ItemStruct) -> TokenStream {
     let (actor_impl_generics, actor_ty_generics, actor_where_clause) =
         actor.generics.split_for_impl();
+
+    let mut actor_generics_with_AT = actor.generics.clone();
+    actor_generics_with_AT.gt_token = Some(Gt(Span::call_site()));
+    actor_generics_with_AT.lt_token = Some(Lt(Span::call_site()));
+    actor_generics_with_AT
+        .params
+        .push(parse_quote! { AT: zestors::core::AddrType });
+    let (actor_impl_generics_with_AT, _, _) = actor_generics_with_AT.split_for_impl();
+
     let actor_ident = &actor.ident;
 
     let (addr_impl_generics, addr_ty_generics, addr_where_clause) = addr.generics.split_for_impl();
@@ -145,8 +154,8 @@ fn addr_traits(addr: &ItemStruct, actor: &ItemStruct) -> TokenStream {
 
     quote! {
         // impl ActorFor
-        impl #actor_impl_generics zestors::core::ActorFor for #actor_ident #actor_ty_generics #actor_where_clause {
-            type Addr<AT: zestors::core::AddrType> = #addr_ident #addr_ty_generics;
+        impl #actor_impl_generics_with_AT zestors::core::ActorFor<AT> for #actor_ident #actor_ty_generics #actor_where_clause {
+            type Addr = #addr_ident #addr_ty_generics;
         }
 
         // implement debug
