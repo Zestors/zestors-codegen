@@ -110,7 +110,7 @@ impl ZestorsMethodArgs {
                     let arg_pat = &self.msg_arg.pat;
                     let arg_ty = &self.msg_arg.ty;
                     addr_args.push({
-                        parse_quote! { #arg_pat: zestors::core::Param<'z, #arg_ty, AT> }
+                        parse_quote! { #arg_pat: zestors::core::ParamT<'z, #arg_ty, AT> }
                     });
                     // panic!("{}", quote::quote! { #arg_pat: zestors::core::Param<'z, #arg_ty, AT> }.to_token_stream().to_string())
                 }
@@ -125,7 +125,7 @@ impl ZestorsMethodArgs {
                             .iter()
                             .zip(msg_element_idents.elems.iter())
                             .for_each(|(msg_element_ty, msg_element_ident)| {
-                                addr_args.push(parse_quote!{ #msg_element_ident:  zestors::core::Param<'z, #msg_element_ty, AT> });
+                                addr_args.push(parse_quote!{ #msg_element_ident:  zestors::core::ParamT<'z, #msg_element_ty, AT> });
                             })
                 }
             },
@@ -134,7 +134,7 @@ impl ZestorsMethodArgs {
                 let arg_pat = &self.msg_arg.pat;
 
                 addr_args.push({
-                    parse_quote! { #arg_pat: zestors::core::Param<'z, #arg_ty, AT> }
+                    parse_quote! { #arg_pat: zestors::core::ParamT<'z, #arg_ty, AT> }
                 })
             }
         };

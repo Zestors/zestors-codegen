@@ -17,14 +17,14 @@ pub fn derive_actor(actor: ItemStruct) -> syn::Result<TokenStream> {
 
             type Halt = ();
 
-            type Exit = (Self, zestors::core::Event<Self>);
+            type Exit = (Self, zestors::core::Signal<Self>);
 
             async fn initialize(init: Self::Init, addr: Self::Addr) -> zestors::core::InitFlow<Self> {
                 zestors::core::InitFlow::Init(init)
             }
 
-            fn handle_event(self, event: zestors::core::Event<Self>, state: &mut zestors::core::State<Self>) -> zestors::core::EventFlow<Self> {
-                zestors::core::EventFlow::Exit((self, event))
+            async fn handle_signal(self, signal: zestors::core::Signal<Self>, state: &mut zestors::core::State<Self>) -> zestors::core::SignalFlow<Self> {
+                zestors::core::SignalFlow::Exit((self, signal))
             }
         }
     })
